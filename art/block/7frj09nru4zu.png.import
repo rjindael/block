@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dwl746hblmd70"
-path.s3tc="res://.godot/imported/heart.png-e8a001f846d2ca6047be102921caf6df.s3tc.ctex"
+uid="uid://c88dyvsmxv2"
+path.s3tc="res://.godot/imported/7frj09nru4zu.png-8439e2de2b1d3edebbb7bf82a38f8e58.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://art/avatar/shirts/heart.png"
-dest_files=["res://.godot/imported/heart.png-e8a001f846d2ca6047be102921caf6df.s3tc.ctex"]
+source_file="res://art/block/7frj09nru4zu.png"
+dest_files=["res://.godot/imported/7frj09nru4zu.png-8439e2de2b1d3edebbb7bf82a38f8e58.s3tc.ctex"]
 
 [params]
 

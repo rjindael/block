@@ -5,8 +5,11 @@
 [ext_resource type="FontFile" uid="uid://rew40vcrdxb8" path="res://themes/eXP/styles/fonts/MS Sans Serif Bold.ttf" id="3_3vvtq"]
 [ext_resource type="Theme" uid="uid://diofr3kthuaw" path="res://themes/eXP/eXP_Luna.tres" id="3_r3g3c"]
 [ext_resource type="Texture2D" uid="uid://c82nfsoduxqoa" path="res://art/avatar/faces/alien.png" id="4_7yvfd"]
-[ext_resource type="Script" uid="uid://cc10rtd1tmkc2" path="res://scenes/customize_character.gd" id="4_dfy5j"]
+[ext_resource type="Script" uid="uid://cc10rtd1tmkc2" path="res://scripts/customize_character.gd" id="4_dfy5j"]
 [ext_resource type="Texture2D" uid="uid://dwl746hblmd70" path="res://art/avatar/shirts/heart.png" id="5_dfy5j"]
+[ext_resource type="Texture2D" uid="uid://cs26582qe6s01" path="res://art/logo.png" id="7_h73c4"]
+[ext_resource type="FontFile" uid="uid://60polxehclih" path="res://fonts/Tahoma.otf" id="8_h73c4"]
+[ext_resource type="FontFile" uid="uid://ci8narrlenev8" path="res://fonts/Enkarus.ttf" id="9_4hago"]
 
 [sub_resource type="Theme" id="Theme_natt5"]
 
@@ -15,10 +18,6 @@ layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 17.0
-offset_top = -1.0
-offset_right = 17.0
-offset_bottom = -1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_natt5")
@@ -29,6 +28,7 @@ title = "Customize Character"
 title_alignment = 0
 initial_position = 1
 size = Vector2i(600, 350)
+visible = false
 unresizable = true
 theme = ExtResource("3_r3g3c")
 theme_override_constants/title_outline_size = -1
@@ -377,6 +377,7 @@ title = "Pick Color"
 title_alignment = 0
 initial_position = 1
 size = Vector2i(326, 290)
+visible = false
 unresizable = true
 theme = ExtResource("3_r3g3c")
 theme_override_constants/title_outline_size = -1
@@ -416,7 +417,54 @@ theme_override_constants/margin_bottom = 4
 layout_mode = 2
 text = "OK"
 
+[node name="ColorPicker2" type="Window" parent="." unique_id=1885128324]
+oversampling_override = 1.0
+title = "Pick Color"
+title_alignment = 0
+initial_position = 1
+size = Vector2i(326, 290)
+visible = false
+unresizable = true
+theme = ExtResource("3_r3g3c")
+theme_override_constants/title_outline_size = -1
+theme_override_fonts/title_font = ExtResource("3_3vvtq")
+theme_override_font_sizes/title_font_size = 12
+
+[node name="Panel2" type="Panel" parent="ColorPicker2" unique_id=861660279]
+offset_right = 326.0
+offset_bottom = 290.0
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="VBoxContainer" parent="ColorPicker2/Panel2" unique_id=1268239355]
+layout_mode = 0
+offset_right = 326.0
+offset_bottom = 270.0
+theme_override_constants/separation = 0
+
+[node name="ColorPicker" type="ColorPicker" parent="ColorPicker2/Panel2/HBoxContainer" unique_id=1676919388]
+layout_mode = 2
+edit_alpha = false
+edit_intensity = false
+can_add_swatches = false
+sampler_visible = false
+color_modes_visible = false
+sliders_visible = false
+hex_visible = false
+presets_visible = false
+
+[node name="MarginContainer" type="MarginContainer" parent="ColorPicker2/Panel2/HBoxContainer" unique_id=2097990880]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="Button" type="Button" parent="ColorPicker2/Panel2/HBoxContainer/MarginContainer" unique_id=427292375]
+layout_mode = 2
+text = "OK"
+
 [node name="Menu" type="VBoxContainer" parent="." unique_id=584123418]
+custom_minimum_size = Vector2(400, 0)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -429,34 +477,68 @@ offset_right = 150.0
 offset_bottom = 105.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 5
+theme_override_constants/separation = 8
+
+[node name="Logo" type="HBoxContainer" parent="Menu" unique_id=1731509748]
+layout_mode = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="Block" type="TextureRect" parent="Menu/Logo" unique_id=1556145075]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+offset_transform_enabled = true
+texture = ExtResource("7_h73c4")
+expand_mode = 1
+
+[node name="Title" type="Label" parent="Menu/Logo" unique_id=277050688]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("8_h73c4")
+theme_override_font_sizes/font_size = 128
+text = "block"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Control2" type="Control" parent="Menu" unique_id=1693404286]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="MOTD" type="Label" parent="Menu" unique_id=1429667305]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("9_4hago")
+text = "that game where you %s stuff"
+horizontal_alignment = 1
+
+[node name="Control" type="Control" parent="Menu" unique_id=1995340555]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
 
 [node name="SingleplayerBtn" type="Button" parent="Menu" unique_id=810051770]
 layout_mode = 2
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Singleplayer"
 
 [node name="MultiplayerBtn" type="Button" parent="Menu" unique_id=1035639912]
 layout_mode = 2
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Multiplayer"
 
 [node name="CharacterBtn" type="Button" parent="Menu" unique_id=1497841975]
 layout_mode = 2
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Character"
 
 [node name="ModsBtn" type="Button" parent="Menu" unique_id=722918830]
 layout_mode = 2
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Mods"
 
 [node name="Spacer" type="Control" parent="Menu" unique_id=507704087]
@@ -472,7 +554,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Options"
 
 [node name="QuitBtn" type="Button" parent="Menu/DetailsContainer" unique_id=1797617408]
@@ -480,5 +562,5 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme = SubResource("Theme_natt5")
 theme_override_fonts/font = ExtResource("1_5mbse")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 32
 text = "Quit"

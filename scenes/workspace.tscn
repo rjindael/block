@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://cij8mqsidgjve"]
+
+[ext_resource type="Texture2D" uid="uid://bojlbg40ndb23" path="res://art/block/block.png" id="1_7cefc"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_vo7lu"]
+size = Vector3(0.15, 0.2, 0.15)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wjago"]
+albedo_color = Color(0.8472468, 0, 0.30539173, 1)
+albedo_texture = ExtResource("1_7cefc")
+
+[node name="Workspace" type="Node3D" unique_id=683410499]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1893900694]
+mesh = SubResource("BoxMesh_vo7lu")
+surface_material_override/0 = SubResource("StandardMaterial3D_wjago")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=818430550]
