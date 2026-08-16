@@ -18,6 +18,8 @@ const DeathUIScript := preload("res://scripts/death_ui.gd")
 @onready var die_audio: AudioStreamPlayer = $DieAudio
 @onready var death_ui: DeathUIScript = get_node("../DeathUI/Root")
 
+@onready var camera_rig = get_node("..")
+
 var r_leg: int
 var l_leg: int
 var r_arm: int
@@ -76,6 +78,12 @@ const RAGDOLL_IMPULSE := 0.5
 const RAGDOLL_TORQUE := 0.3
 const FORCEFIELD_DURATION := 4.0
 
+const SMOKE_TEXTURE := preload("res://art/smoke.png")
+const STAR_TEXTURE := preload("res://art/star.png")
+const POOF_SMOKE_COUNT := 7
+const POOF_STAR_COUNT := 10
+const POOF_DURATION := 1.0
+
 var is_dead := false
 var spawn_transform := Transform3D.IDENTITY
 var ragdoll_bodies: Array[RigidBody3D] = []
@@ -91,6 +99,7 @@ func _ready():
 
 	spawn_transform = global_transform
 	death_ui.respawn_requested.connect(respawn)
+	spawn_poof()
 
 
 func _physics_process(delta):
@@ -237,6 +246,7 @@ func die() -> void:
 		return
 
 	is_dead = true
+	hp = 0
 	velocity = Vector3.ZERO
 	walk_audio.stop()
 	die_audio.play()
@@ -260,6 +270,54 @@ func respawn() -> void:
 	clear_ragdoll()
 	character.visible = true
 	spawn_forcefield()
+	spawn_poof()
+
+func spawn_poof() -> void:
+	var origin := global_transform.origin
+	var world := get_tree().current_scene
+
+	for i in POOF_SMOKE_COUNT:
+		var puff := Sprite3D.new()
+		puff.texture = SMOKE_TEXTURE
+		puff.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		puff.pixel_size = 0.008
+		puff.modulate = Color(1.0, 1.0, 1.0, randf_range(0.6, 0.85))
+		world.add_child(puff)
+
+		puff.global_position = origin + Vector3(randf_range(-0.3, 0.3), randf_range(0.0, 1.3), randf_range(-0.3, 0.3))
+		puff.rotation.z = randf_range(0.0, TAU)
+		var start_scale := randf_range(0.7, 1.3)
+		puff.scale = Vector3.ONE * start_scale
+
+		var tw := puff.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(puff, "position:y", puff.position.y + randf_range(0.4, 0.9), POOF_DURATION)
+		tw.tween_property(puff, "scale", Vector3.ONE * start_scale * 1.6, POOF_DURATION)
+		tw.tween_property(puff, "modulate:a", 0.0, POOF_DURATION)
+		tw.chain().tween_callback(puff.queue_free)
+
+	for i in POOF_STAR_COUNT:
+		var star := Sprite3D.new()
+		star.texture = STAR_TEXTURE
+		star.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		star.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		star.pixel_size = 0.025
+		star.modulate = Color.from_hsv(randf(), 0.85, 1.0)
+		world.add_child(star)
+
+		star.global_position = origin + Vector3(0.0, 0.7, 0.0)
+
+		var dir := Vector3(randf_range(-1.0, 1.0), randf_range(0.3, 1.0), randf_range(-1.0, 1.0)).normalized()
+		var dist := randf_range(0.4, 1.0)
+
+		var tw := star.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(star, "position", star.position + dir * dist, POOF_DURATION * 0.8) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(star, "rotation:z", randf_range(-TAU, TAU), POOF_DURATION)
+		tw.tween_property(star, "modulate:a", 0.0, POOF_DURATION * 0.7).set_delay(POOF_DURATION * 0.3)
+		tw.chain().tween_callback(star.queue_free)
+
 
 func spawn_ragdoll() -> void:
 	var world := get_tree().current_scene
@@ -288,8 +346,8 @@ func spawn_ragdoll() -> void:
 		shape.position = aabb.get_center()
 		body.add_child(shape)
 
-		#body.apply_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(0.0, 0.3), randf_range(-1.0, 1.0)) * RAGDOLL_IMPULSE)
-		#body.apply_torque_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * RAGDOLL_TORQUE)
+		body.apply_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * RAGDOLL_IMPULSE)
+		body.apply_torque_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * RAGDOLL_TORQUE)
 
 		ragdoll_bodies.append(body)
 
@@ -323,18 +381,18 @@ const BOX_EDGES := [
 func spawn_forcefield() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color = FORCEFIELD_COLORS[0]
 	mat.emission_enabled = true
 	mat.emission = FORCEFIELD_COLORS[0]
 	mat.emission_energy_multiplier = 1.5
 
 	var tween := create_tween().set_loops()
-	for i in range(1, FORCEFIELD_COLORS.size()):
-		tween.tween_property(mat, "albedo_color", FORCEFIELD_COLORS[i], FORCEFIELD_CYCLE_SPEED)
-		tween.parallel().tween_property(mat, "emission", FORCEFIELD_COLORS[i], FORCEFIELD_CYCLE_SPEED)
-		
-	tween.tween_property(mat, "albedo_color", FORCEFIELD_COLORS[0], FORCEFIELD_CYCLE_SPEED)
-	tween.parallel().tween_property(mat, "emission", FORCEFIELD_COLORS[0], FORCEFIELD_CYCLE_SPEED)
+	var colors := FORCEFIELD_COLORS + [FORCEFIELD_COLORS[0]]
+	for i in range(1, colors.size()):
+		tween.tween_method(_set_forcefield_hue.bind(mat), colors[i - 1], colors[i], FORCEFIELD_CYCLE_SPEED)
+
+	camera_rig.register_fade_material(mat)
 
 	var is_tween_bound := false
 
@@ -348,12 +406,21 @@ func spawn_forcefield() -> void:
 		cage.position = aabb.get_center()
 
 		part.add_child(cage)
-		
+
 		if not is_tween_bound:
 			tween.bind_node(cage)
 			is_tween_bound = true
 
 		get_tree().create_timer(FORCEFIELD_DURATION).timeout.connect(cage.queue_free)
+
+	var cleanup_timer := get_tree().create_timer(FORCEFIELD_DURATION)
+	cleanup_timer.timeout.connect(tween.kill)
+	cleanup_timer.timeout.connect(camera_rig.unregister_fade_material.bind(mat))
+
+
+func _set_forcefield_hue(color: Color, mat: StandardMaterial3D) -> void:
+	mat.albedo_color = Color(color.r, color.g, color.b, mat.albedo_color.a)
+	mat.emission = color
 
 
 func make_wireframe_cage(size: Vector3, mat: Material) -> Node3D:

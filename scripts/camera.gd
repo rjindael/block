@@ -28,7 +28,7 @@ const TAB_ZOOM_DISTANCE := 4.0
 
 @export var min_zoom := 0.0
 @export var max_zoom := 36.0
-@export var zoom_speed := 10.0
+@export var zoom_speed := 16.0
 @export var zoom_smooth := 8.0
 @export var scroll_step := 1.2
 
@@ -75,6 +75,12 @@ func _set_body_alpha(alpha: float) -> void:
 	for mat in _body_mats:
 		mat.albedo_color.a = alpha
 
+func register_fade_material(mat: StandardMaterial3D) -> void:
+	_body_mats.append(mat)
+
+func unregister_fade_material(mat: StandardMaterial3D) -> void:
+	_body_mats.erase(mat)
+
 func _clamp_pitch() -> void:
 	if first_person:
 		pitch = clamp(pitch, fp_min_pitch, fp_max_pitch)
@@ -88,8 +94,14 @@ func _input(event: InputEvent) -> void:
 			mouse_locked = not mouse_locked
 			_update_mouselock_icon()
 		elif event.physical_keycode == KEY_TAB:
-			zoom_target = TAB_ZOOM_DISTANCE
+			zoom_target = TAB_ZOOM_DISTANCE if first_person else min_zoom
 			mouse_locked = true
+			_update_mouselock_icon()
+		elif event.physical_keycode == KEY_ESCAPE:
+			mouse_locked = false
+			rotating = false
+			if not player.get("is_dead"):
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			_update_mouselock_icon()
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -118,7 +130,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _update_mouselock_icon() -> void:
-	mouselock_icon.texture = MOUSELOCK_ON if mouse_locked else MOUSELOCK_OFF
+	var active : bool = mouse_locked or player.get("is_dead")
+	mouselock_icon.texture = MOUSELOCK_ON if active else MOUSELOCK_OFF
 
 
 func _process(delta: float) -> void:
@@ -146,11 +159,11 @@ func _process(delta: float) -> void:
 	zoom = lerp(zoom, zoom_target, zoom_smooth * delta)
 	first_person = zoom <= fp_full_threshold + 0.5
 
-	var in_fp_zone := zoom_target <= 0.2
+	var in_fp_zone := zoom_target <= fp_lock_threshold
 	if in_fp_zone and not _was_in_fp_zone:
 		mouse_locked = true
-		_update_mouselock_icon()
 	_was_in_fp_zone = in_fp_zone
+	_update_mouselock_icon()
 
 	# While dead, mouse lock preference is disregarded entirely - always
 	# captured, no matter what state it was in when you died.
