@@ -13,6 +13,5 @@ void fragment() {
     }
 
     vec4 original = texture(screen_texture, uv);
-    vec3 result;
-    COLOR = vec4(result, original.a);
+    COLOR = original;
 }
