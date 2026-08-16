@@ -50,6 +50,7 @@ const IDLE_FREQ := 0.8
 const IDLE_AMPLITUDE := 0.1
 const WALK_BLEND_SPEED := 5.0
 const JUMP_BLEND_SPEED := 6.0
+const LAND_BLEND_SPEED := 1.8
 const JUMP_ARM_RAISE := PI
 
 # WIP for ramp handling.
@@ -191,7 +192,8 @@ func update_animation(delta: float):
 
 	update_walk_audio(moving and is_on_floor())
 
-	jump_blend = move_toward(jump_blend, 0.0 if is_on_floor() else 1.0, delta * JUMP_BLEND_SPEED)
+	var jump_blend_speed := LAND_BLEND_SPEED if is_on_floor() else JUMP_BLEND_SPEED
+	jump_blend = move_toward(jump_blend, 0.0 if is_on_floor() else 1.0, delta * jump_blend_speed)
 
 	var slope_deg := 0.0
 
@@ -233,14 +235,16 @@ func apply_locomotion(time: float):
 
 
 func apply_jump_overlay():
-	var final_r_angle: float = lerp(r_arm_angle, JUMP_ARM_RAISE, jump_blend)
-	var final_l_angle: float = lerp(l_arm_angle, JUMP_ARM_RAISE, jump_blend)
+	var blend := smoothstep(0.0, 1.0, jump_blend)
+
+	var final_r_angle: float = lerp(r_arm_angle, JUMP_ARM_RAISE, blend)
+	var final_l_angle: float = lerp(l_arm_angle, JUMP_ARM_RAISE, blend)
 
 	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(RARM_SWING_AXIS, final_r_angle))
 	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(LARM_SWING_AXIS, final_l_angle))
 
-	skeleton.set_bone_pose_rotation(r_leg, skeleton.get_bone_pose_rotation(r_leg).slerp(base_pose[r_leg], jump_blend))
-	skeleton.set_bone_pose_rotation(l_leg, skeleton.get_bone_pose_rotation(l_leg).slerp(base_pose[l_leg], jump_blend))
+	skeleton.set_bone_pose_rotation(r_leg, skeleton.get_bone_pose_rotation(r_leg).slerp(base_pose[r_leg], blend))
+	skeleton.set_bone_pose_rotation(l_leg, skeleton.get_bone_pose_rotation(l_leg).slerp(base_pose[l_leg], blend))
 
 
 func die() -> void:
