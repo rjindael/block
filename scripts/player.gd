@@ -4,12 +4,19 @@ extends CharacterBody3D
 
 @export var move_speed := 2.5
 @export var jump_velocity := 7.0
-@export var gravity := 24.0
+@export var gravity := 18.0
 @export var turn_speed := 6.0
+
+const DeathUIScript := preload("res://scripts/death_ui.gd")
 
 @onready var pivot: Node3D = $Pivot
 @onready var camera_pivot: Node3D = $"../CameraYaw"
 @onready var skeleton: Skeleton3D = $Pivot/Character/Armature/Skeleton3D
+@onready var character: Node3D = $Pivot/Character
+@onready var walk_audio: AudioStreamPlayer = $WalkAudio
+@onready var jump_audio: AudioStreamPlayer = $JumpAudio
+@onready var die_audio: AudioStreamPlayer = $DieAudio
+@onready var death_ui: DeathUIScript = get_node("../DeathUI/Root")
 
 var r_leg: int
 var l_leg: int
@@ -34,7 +41,7 @@ var hp := MAX_HP
 var poison := 0.0
 var poison_tick_timer := 0.0
 
-const WALK_FREQ := 7.5
+const WALK_FREQ := 8.5
 const WALK_AMPLITUDE := 0.7
 const IDLE_FREQ := 0.8
 const IDLE_AMPLITUDE := 0.1
@@ -56,6 +63,23 @@ const LLEG_SWING_AXIS := Vector3(-0.0498, -0.3779, -0.9245)
 const RARM_SWING_AXIS := Vector3(-0.7399, 0.6727, 0.0)
 const LARM_SWING_AXIS := Vector3(-0.7399, -0.6727, 0.0)
 
+# temporary until real physics aand building are implemented. 
+const RAGDOLL_PARTS := [
+	"RLeg_BONE/RLeg",
+	"LLeg_BONE/LLeg",
+	"RArm_BONE/RArm",
+	"LArm_BONE/LArm",
+	"Head_BONE/Head",
+	"Spine/Torso",
+]
+const RAGDOLL_IMPULSE := 0.5
+const RAGDOLL_TORQUE := 0.3
+const FORCEFIELD_DURATION := 4.0
+
+var is_dead := false
+var spawn_transform := Transform3D.IDENTITY
+var ragdoll_bodies: Array[RigidBody3D] = []
+
 func _ready():
 	r_leg = skeleton.find_bone("RLeg_BONE")
 	l_leg = skeleton.find_bone("LLeg_BONE")
@@ -65,8 +89,14 @@ func _ready():
 	for bone in [r_leg, l_leg, r_arm, l_arm]:
 		base_pose[bone] = skeleton.get_bone_pose_rotation(bone)
 
+	spawn_transform = global_transform
+	death_ui.respawn_requested.connect(respawn)
+
 
 func _physics_process(delta):
+	if is_dead:
+		return
+
 	handle_movement(delta)
 
 	if is_on_floor():
@@ -84,8 +114,10 @@ func update_health(delta: float):
 		poison_tick_timer += delta
 		if poison_tick_timer >= POISON_TICK_INTERVAL:
 			poison_tick_timer -= POISON_TICK_INTERVAL
-			var poison_hearts := int(poison / float(HP_PER_HEART))
+			var poison_hearts := roundi(poison / float(HP_PER_HEART))
 			hp = max(hp - poison_hearts, 0)
+			if hp <= 0:
+				die()
 	else:
 		poison_tick_timer = 0.0
 
@@ -95,6 +127,8 @@ func add_poison(hearts: float):
 
 func take_damage(amount: int):
 	hp = clamp(hp - amount, 0, MAX_HP)
+	if hp <= 0:
+		die()
 
 func heal(amount: int):
 	hp = clamp(hp + amount, 0, MAX_HP)
@@ -127,13 +161,24 @@ func handle_movement(delta):
 		velocity.y -= gravity * delta
 	elif Input.is_action_pressed("jump"):
 		velocity.y = jump_velocity
+		if Input.is_action_just_pressed("jump"):
+			jump_audio.play()
 
 	move_and_slide()
+
+func update_walk_audio(walking: bool) -> void:
+	if walking:
+		if not walk_audio.playing:
+			walk_audio.play()
+	elif walk_audio.playing:
+		walk_audio.stop()
 
 
 func update_animation(delta: float):
 	var moving := Vector2(velocity.x, velocity.z).length() > 0.1
 	walk_blend = move_toward(walk_blend, 1.0 if moving else 0.0, delta * WALK_BLEND_SPEED)
+
+	update_walk_audio(moving and is_on_floor())
 
 	jump_blend = move_toward(jump_blend, 0.0 if is_on_floor() else 1.0, delta * JUMP_BLEND_SPEED)
 
@@ -185,3 +230,160 @@ func apply_jump_overlay():
 
 	skeleton.set_bone_pose_rotation(r_leg, skeleton.get_bone_pose_rotation(r_leg).slerp(base_pose[r_leg], jump_blend))
 	skeleton.set_bone_pose_rotation(l_leg, skeleton.get_bone_pose_rotation(l_leg).slerp(base_pose[l_leg], jump_blend))
+
+
+func die() -> void:
+	if is_dead:
+		return
+
+	is_dead = true
+	velocity = Vector3.ZERO
+	walk_audio.stop()
+	die_audio.play()
+
+	# Mouse capture while dead is handled by camera.gd (always captured,
+	# regardless of mouse_locked, the instant is_dead is true) - clicking to
+	# respawn doesn't need a visible cursor since it's just "any left click."
+
+	spawn_ragdoll()
+	death_ui.start_countdown()
+
+
+func respawn() -> void:
+	is_dead = false
+	hp = MAX_HP
+	poison = 0.0
+	poison_tick_timer = 0.0
+	global_transform = spawn_transform
+	velocity = Vector3.ZERO
+
+	clear_ragdoll()
+	character.visible = true
+	spawn_forcefield()
+
+func spawn_ragdoll() -> void:
+	var world := get_tree().current_scene
+
+	for rel_path in RAGDOLL_PARTS:
+		var part := skeleton.get_node(rel_path) as MeshInstance3D
+		if part == null or part.mesh == null:
+			continue
+
+		var body := RigidBody3D.new()
+		body.global_transform = part.global_transform
+		world.add_child(body)
+
+		var mesh_copy := MeshInstance3D.new()
+		mesh_copy.mesh = part.mesh
+		var mat := part.get_surface_override_material(0)
+		if mat:
+			mesh_copy.set_surface_override_material(0, mat)
+		body.add_child(mesh_copy)
+
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		var aabb := part.mesh.get_aabb()
+		box.size = aabb.size
+		shape.shape = box
+		shape.position = aabb.get_center()
+		body.add_child(shape)
+
+		#body.apply_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(0.0, 0.3), randf_range(-1.0, 1.0)) * RAGDOLL_IMPULSE)
+		#body.apply_torque_impulse(Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * RAGDOLL_TORQUE)
+
+		ragdoll_bodies.append(body)
+
+	character.visible = false
+
+
+func clear_ragdoll() -> void:
+	for body in ragdoll_bodies:
+		if is_instance_valid(body):
+			body.queue_free()
+	ragdoll_bodies.clear()
+
+# this should be its own script soon
+const FORCEFIELD_CAGE_MARGIN := 1
+const FORCEFIELD_BAR_THICKNESS := 0.25
+const FORCEFIELD_CYCLE_SPEED := 0.15
+const FORCEFIELD_COLORS := [
+	Color(1.0, 0.2, 0.2),
+	Color(1.0, 0.6, 0.1),
+	Color(1.0, 1.0, 0.2),
+	Color(0.2, 1.0, 0.3),
+	Color(0.2, 0.6, 1.0),
+	Color(0.8, 0.2, 1.0),
+]
+const BOX_EDGES := [
+	[0, 1], [1, 2], [2, 3], [3, 0],
+	[4, 5], [5, 6], [6, 7], [7, 4],
+	[0, 4], [1, 5], [2, 6], [3, 7],
+]
+
+func spawn_forcefield() -> void:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = FORCEFIELD_COLORS[0]
+	mat.emission_enabled = true
+	mat.emission = FORCEFIELD_COLORS[0]
+	mat.emission_energy_multiplier = 1.5
+
+	var tween := create_tween().set_loops()
+	for i in range(1, FORCEFIELD_COLORS.size()):
+		tween.tween_property(mat, "albedo_color", FORCEFIELD_COLORS[i], FORCEFIELD_CYCLE_SPEED)
+		tween.parallel().tween_property(mat, "emission", FORCEFIELD_COLORS[i], FORCEFIELD_CYCLE_SPEED)
+		
+	tween.tween_property(mat, "albedo_color", FORCEFIELD_COLORS[0], FORCEFIELD_CYCLE_SPEED)
+	tween.parallel().tween_property(mat, "emission", FORCEFIELD_COLORS[0], FORCEFIELD_CYCLE_SPEED)
+
+	var is_tween_bound := false
+
+	for i in RAGDOLL_PARTS.size():
+		var part := skeleton.get_node(RAGDOLL_PARTS[i]) as MeshInstance3D
+		if part == null or part.mesh == null:
+			continue
+
+		var aabb := part.mesh.get_aabb()
+		var cage := make_wireframe_cage(aabb.size * FORCEFIELD_CAGE_MARGIN, mat)
+		cage.position = aabb.get_center()
+
+		part.add_child(cage)
+		
+		if not is_tween_bound:
+			tween.bind_node(cage)
+			is_tween_bound = true
+
+		get_tree().create_timer(FORCEFIELD_DURATION).timeout.connect(cage.queue_free)
+
+
+func make_wireframe_cage(size: Vector3, mat: Material) -> Node3D:
+	var root := Node3D.new()
+	var h := size * 0.5
+	var corners := [
+		Vector3(-h.x, -h.y, -h.z), Vector3(h.x, -h.y, -h.z),
+		Vector3(h.x, h.y, -h.z), Vector3(-h.x, h.y, -h.z),
+		Vector3(-h.x, -h.y, h.z), Vector3(h.x, -h.y, h.z),
+		Vector3(h.x, h.y, h.z), Vector3(-h.x, h.y, h.z),
+	]
+
+	for edge in BOX_EDGES:
+		root.add_child(make_cage_bar(corners[edge[0]], corners[edge[1]], mat))
+
+	return root
+
+
+func make_cage_bar(a: Vector3, b: Vector3, mat: Material) -> MeshInstance3D:
+	var bar := MeshInstance3D.new()
+	var box := BoxMesh.new()
+
+	box.size = Vector3(FORCEFIELD_BAR_THICKNESS, FORCEFIELD_BAR_THICKNESS, a.distance_to(b) + FORCEFIELD_BAR_THICKNESS)
+	
+	bar.mesh = box
+	bar.material_override = mat
+	bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	var dir := (b - a).normalized()
+	var up := Vector3.UP if absf(dir.dot(Vector3.UP)) < 0.999 else Vector3.RIGHT
+	bar.transform = Transform3D(Basis.looking_at(dir, up), (a + b) * 0.5)
+
+	return bar

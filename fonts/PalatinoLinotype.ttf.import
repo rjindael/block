@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://60polxehclih"
-path="res://.godot/imported/Tahoma.otf-63e127a14769c347d61604f178a288d5.fontdata"
+uid="uid://c44kylsdaxmdu"
+path="res://.godot/imported/PalatinoLinotype.ttf-9cb04e2be90ef56b641546ef9284cc3b.fontdata"
 
 [deps]
 
-source_file="res://fonts/Tahoma.otf"
-dest_files=["res://.godot/imported/Tahoma.otf-63e127a14769c347d61604f178a288d5.fontdata"]
+source_file="res://fonts/PalatinoLinotype.ttf"
+dest_files=["res://.godot/imported/PalatinoLinotype.ttf-9cb04e2be90ef56b641546ef9284cc3b.fontdata"]
 
 [params]
 
@@ -20,9 +20,9 @@ multichannel_signed_distance_field=false
 msdf_pixel_range=8
 msdf_size=48
 allow_system_fallback=true
-force_autohinter=true
+force_autohinter=false
 modulate_color_glyphs=false
-hinting=2
+hinting=3
 subpixel_positioning=4
 keep_rounding_remainders=true
 oversampling=0.0

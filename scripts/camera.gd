@@ -1,5 +1,14 @@
 extends Node3D
 
+const MOUSELOCK_ON := preload("res://art/ui/mouselock/on.png")
+const MOUSELOCK_OFF := preload("res://art/ui/mouselock/off.png")
+
+# tab-out zoom distance
+const TAB_ZOOM_DISTANCE := 4.0
+
+# global time scale that should be state dependent but its here for now
+@export var time_scale := 0.9
+
 @onready var player: CharacterBody3D = $Player
 @onready var camera_target: Marker3D = $Player/Pivot/CameraTarget
 @onready var camera_yaw: Node3D = $CameraYaw
@@ -7,6 +16,7 @@ extends Node3D
 @onready var camera: Camera3D = $CameraYaw/CameraPitch/Camera3D
 @onready var head_camera: Marker3D = $Player/Pivot/HeadCamera
 @onready var player_pivot: Node3D = $Player/Pivot
+@onready var mouselock_icon: TextureRect = $HUD/MouseLockIcon
 
 @export var mouse_sensitivity := 0.004
 @export var controller_sensitivity := 3.0
@@ -36,12 +46,18 @@ var zoom_target := 4.0
 var first_person := false
 var rotating := false
 
+# Mouse lock/shift lock
+var mouse_locked := false
+var _was_in_fp_zone := false
+
 var _body_meshes: Array[MeshInstance3D] = []
 var _body_mats: Array[StandardMaterial3D] = []
 
 func _ready() -> void:
+	Engine.time_scale = time_scale
 	camera.position = Vector3(0.0, 0.0, zoom)
 	_cache_body_meshes()
+	_update_mouselock_icon()
 
 #TODO: not necessary if the character becomes joined again so it'll have one mat.
 func _cache_body_meshes() -> void:
@@ -67,13 +83,22 @@ func _clamp_pitch() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_M:
+			mouse_locked = not mouse_locked
+			_update_mouselock_icon()
+		elif event.physical_keycode == KEY_TAB:
+			zoom_target = TAB_ZOOM_DISTANCE
+			mouse_locked = true
+			_update_mouselock_icon()
+
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
-		if not first_person:
+		if not first_person and not mouse_locked:
 			rotating = event.pressed
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if rotating else Input.MOUSE_MODE_VISIBLE
 
 	if event is InputEventMouseMotion:
-		if rotating or first_person:
+		if rotating or mouse_locked:
 			yaw   -= event.relative.x * mouse_sensitivity
 			pitch -= event.relative.y * mouse_sensitivity
 			_clamp_pitch()
@@ -83,7 +108,17 @@ func _input(event: InputEvent) -> void:
 			zoom_target -= scroll_step
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			zoom_target += scroll_step
+			# Scrolling out is the manual "let me out" gesture - unlike Tab
+			# (which explicitly wants lock engaged), zooming out by hand should
+			# hand control back rather than staying shift-locked.
+			if mouse_locked:
+				mouse_locked = false
+				_update_mouselock_icon()
 		zoom_target = clamp(zoom_target, min_zoom, max_zoom)
+
+
+func _update_mouselock_icon() -> void:
+	mouselock_icon.texture = MOUSELOCK_ON if mouse_locked else MOUSELOCK_OFF
 
 
 func _process(delta: float) -> void:
@@ -112,7 +147,17 @@ func _process(delta: float) -> void:
 	first_person = zoom <= fp_full_threshold + 0.5
 
 	var in_fp_zone := zoom_target <= 0.2
-	if in_fp_zone or first_person:
+	if in_fp_zone and not _was_in_fp_zone:
+		mouse_locked = true
+		_update_mouselock_icon()
+	_was_in_fp_zone = in_fp_zone
+
+	# While dead, mouse lock preference is disregarded entirely - always
+	# captured, no matter what state it was in when you died.
+	if player.get("is_dead"):
+		rotating = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	elif mouse_locked:
 		rotating = false
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif not rotating:
@@ -125,8 +170,9 @@ func _process(delta: float) -> void:
 	camera_yaw.rotation.y = yaw
 	camera_pitch.rotation.x = pitch
 	camera.global_transform.basis = camera_pitch.global_transform.basis
-	if first_person:
+	if mouse_locked:
 		player_pivot.rotation.y = yaw
+	if first_person:
 		camera.global_position = head_camera.global_position
 		camera.global_transform.basis = camera_pitch.global_transform.basis
 	else:

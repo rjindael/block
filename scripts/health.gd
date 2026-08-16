@@ -33,7 +33,7 @@ func make_heart() -> TextureRect:
 
 func update_hearts():
 	var total := hearts.size()
-	var poison_hearts := int(player.poison / float(player.HP_PER_HEART))
+	var poison_hearts := roundi(player.poison / float(player.HP_PER_HEART))
 	poison_hearts = min(poison_hearts, total)
 	var poison_start := total - poison_hearts
 

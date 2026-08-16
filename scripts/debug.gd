@@ -5,6 +5,7 @@ const SkyScript := preload("res://scripts/sky.gd")
 
 const SKY_CYCLE_KEY := KEY_N
 const POISON_KEY := KEY_P
+const DIE_KEY := KEY_X
 
 const POISON_DOSE := 1.0 # .. for now.... (in # of hearts to make ill)
 
@@ -16,7 +17,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 
 	if event.physical_keycode == POISON_KEY:
-		print("hi")
 		player.add_poison(POISON_DOSE)
 	elif event.physical_keycode == SKY_CYCLE_KEY:
 		sky.cycle_sky()
+	elif event.physical_keycode == DIE_KEY:
+		player.die()

@@ -91,3 +91,4 @@ camera_zoom_out={
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+textures/canvas_textures/default_texture_filter=0
