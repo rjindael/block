@@ -77,7 +77,7 @@ const RAGDOLL_PARTS := [
 ]
 const RAGDOLL_IMPULSE := 0.5
 const RAGDOLL_TORQUE := 0.3
-const FORCEFIELD_DURATION := 4.0
+const FORCEFIELD_DURATION := 8.0
 
 const SMOKE_TEXTURE := preload("res://art/smoke.png")
 const STAR_TEXTURE := preload("res://art/star.png")
@@ -276,7 +276,7 @@ func respawn() -> void:
 
 func spawn_poof() -> void:
 	var origin := global_transform.origin
-	var world := camera_rig
+	var world : Node3D = camera_rig
 
 	spawn_audio.play()
 
@@ -286,7 +286,7 @@ func spawn_poof() -> void:
 		puff.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		puff.pixel_size = 0.008
 		puff.modulate = Color(1.0, 1.0, 1.0, randf_range(0.6, 0.85))
-		world.add_child(puff)
+		world.add_child.call_deferred(puff)
 
 		puff.global_position = origin + Vector3(randf_range(-0.3, 0.3), randf_range(0.0, 1.3), randf_range(-0.3, 0.3))
 		puff.rotation.z = randf_range(0.0, TAU)
@@ -307,7 +307,7 @@ func spawn_poof() -> void:
 		star.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		star.pixel_size = 0.025
 		star.modulate = Color.from_hsv(randf(), 0.85, 1.0)
-		world.add_child(star)
+		world.add_child.call_deferred(star)
 
 		star.global_position = origin + Vector3(0.0, 0.7, 0.0)
 
@@ -324,7 +324,7 @@ func spawn_poof() -> void:
 
 
 func spawn_ragdoll() -> void:
-	var world := camera_rig
+	var world : Node3D = camera_rig
 
 	for rel_path in RAGDOLL_PARTS:
 		var part := skeleton.get_node(rel_path) as MeshInstance3D
@@ -367,7 +367,7 @@ func clear_ragdoll() -> void:
 # this should be its own script soon
 const FORCEFIELD_CAGE_MARGIN := 1
 const FORCEFIELD_BAR_THICKNESS := 0.25
-const FORCEFIELD_CYCLE_SPEED := 0.15
+const FORCEFIELD_CYCLE_SPEED := 0.5
 const FORCEFIELD_COLORS := [
 	Color(1.0, 0.2, 0.2),
 	Color(1.0, 0.6, 0.1),
