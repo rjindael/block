@@ -2,7 +2,7 @@
 
 extends CharacterBody3D
 
-@export var move_speed := 2.5
+@export var move_speed := 3.0
 @export var jump_velocity := 7.0
 @export var gravity := 18.0
 @export var turn_speed := 6.0
@@ -16,6 +16,7 @@ const DeathUIScript := preload("res://scripts/death_ui.gd")
 @onready var walk_audio: AudioStreamPlayer = $WalkAudio
 @onready var jump_audio: AudioStreamPlayer = $JumpAudio
 @onready var die_audio: AudioStreamPlayer = $DieAudio
+@onready var spawn_audio: AudioStreamPlayer = $SpawnAudio
 @onready var death_ui: DeathUIScript = get_node("../DeathUI/Root")
 
 @onready var camera_rig = get_node("..")
@@ -80,7 +81,7 @@ const FORCEFIELD_DURATION := 4.0
 
 const SMOKE_TEXTURE := preload("res://art/smoke.png")
 const STAR_TEXTURE := preload("res://art/star.png")
-const POOF_SMOKE_COUNT := 7
+const POOF_SMOKE_COUNT := 5
 const POOF_STAR_COUNT := 10
 const POOF_DURATION := 1.0
 
@@ -99,6 +100,7 @@ func _ready():
 
 	spawn_transform = global_transform
 	death_ui.respawn_requested.connect(respawn)
+	spawn_forcefield()
 	spawn_poof()
 
 
@@ -274,7 +276,9 @@ func respawn() -> void:
 
 func spawn_poof() -> void:
 	var origin := global_transform.origin
-	var world := get_tree().current_scene
+	var world := camera_rig
+
+	spawn_audio.play()
 
 	for i in POOF_SMOKE_COUNT:
 		var puff := Sprite3D.new()
@@ -320,7 +324,7 @@ func spawn_poof() -> void:
 
 
 func spawn_ragdoll() -> void:
-	var world := get_tree().current_scene
+	var world := camera_rig
 
 	for rel_path in RAGDOLL_PARTS:
 		var part := skeleton.get_node(rel_path) as MeshInstance3D

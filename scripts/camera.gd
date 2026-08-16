@@ -2,6 +2,7 @@ extends Node3D
 
 const MOUSELOCK_ON := preload("res://art/ui/mouselock/on.png")
 const MOUSELOCK_OFF := preload("res://art/ui/mouselock/off.png")
+const PlayerScene := preload("res://scenes/player.tscn")
 
 # tab-out zoom distance
 const TAB_ZOOM_DISTANCE := 4.0
@@ -52,6 +53,9 @@ var _was_in_fp_zone := false
 
 var _body_meshes: Array[MeshInstance3D] = []
 var _body_mats: Array[StandardMaterial3D] = []
+
+func _enter_tree() -> void:
+	add_child(PlayerScene.instantiate())
 
 func _ready() -> void:
 	Engine.time_scale = time_scale

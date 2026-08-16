@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://bv5isbka1pncb" path="res://scripts/camera.gd" id="1_lbhrr"]
 [ext_resource type="Texture2D" uid="uid://fwhej2wo3ygh" path="res://art/block/top.png" id="2_lbhrr"]
-[ext_resource type="PackedScene" uid="uid://eodxj6hl20yv" path="res://scenes/player.tscn" id="3_p57ef"]
 [ext_resource type="Shader" uid="uid://bxwcfxbd6ht1" path="res://shaders/pixelate.gdshader" id="4_u5sy4"]
 [ext_resource type="Script" uid="uid://cg5afacktwwpq" path="res://scripts/health.gd" id="6_hud01"]
 [ext_resource type="Script" uid="uid://rrbt5uqbipp1" path="res://scripts/sky.gd" id="7_sky02"]
@@ -53,8 +52,6 @@ shape = SubResource("BoxShape3D_ig7tw")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1526030117]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 6, 0)
 shadow_enabled = true
-
-[node name="Player" parent="." unique_id=870860504 instance=ExtResource("3_p57ef")]
 
 [node name="CameraYaw" type="Marker3D" parent="." unique_id=1402326390]
 transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)

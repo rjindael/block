@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://20mhfb0t4jxc" path="res://art/sfx/walk.wav" id="3_walk01"]
 [ext_resource type="AudioStream" uid="uid://conxfbtqq2vof" path="res://art/sfx/jump.wav" id="4_jump01"]
 [ext_resource type="AudioStream" path="res://art/sfx/die.wav" id="5_die01"]
+[ext_resource type="AudioStream" path="res://art/sfx/spawn.wav" id="6_spawn01"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hqtel"]
 radius = 0.25
@@ -35,3 +36,8 @@ stream = ExtResource("4_jump01")
 
 [node name="DieAudio" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("5_die01")
+volume_db = -8.0
+
+[node name="SpawnAudio" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("6_spawn01")
+volume_db = -8.0
