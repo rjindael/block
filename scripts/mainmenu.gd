@@ -1,6 +1,6 @@
 extends Control
 
-var verbs = ["make", "break", "shake", "rake", "take", "wake", "fake", "bake"]
+var verbs = ["make", "break", "shake", "rake", "take", "wake", "fake", "bake", "cake", "$!*%@^#+"]
 
 func _ready() -> void:
 	$Menu/SingleplayerBtn.pressed.connect(_on_singleplayer)

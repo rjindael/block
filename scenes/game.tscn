@@ -4,7 +4,9 @@
 [ext_resource type="Texture2D" uid="uid://fwhej2wo3ygh" path="res://art/block/top.png" id="2_lbhrr"]
 [ext_resource type="PackedScene" uid="uid://eodxj6hl20yv" path="res://scenes/player.tscn" id="3_p57ef"]
 [ext_resource type="Shader" uid="uid://bxwcfxbd6ht1" path="res://shaders/pixelate.gdshader" id="4_u5sy4"]
-[ext_resource type="Texture2D" uid="uid://cmq7ogjkrp0o" path="res://art/sky.png" id="5_sky01"]
+[ext_resource type="Script" uid="uid://cg5afacktwwpq" path="res://scripts/health.gd" id="6_hud01"]
+[ext_resource type="Script" uid="uid://rrbt5uqbipp1" path="res://scripts/sky.gd" id="7_sky02"]
+[ext_resource type="Script" uid="uid://d25cuweohq2f2" path="res://scripts/debug.gd" id="8_dbg01"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_7dm0k"]
 lightmap_size_hint = Vector2i(604, 316)
@@ -25,7 +27,6 @@ shader = ExtResource("4_u5sy4")
 shader_parameter/pixel_size = 2.50000007125
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_lbhrr"]
-panorama = ExtResource("5_sky01")
 
 [sub_resource type="Sky" id="Sky_iywne"]
 sky_material = SubResource("PanoramaSkyMaterial_lbhrr")
@@ -71,12 +72,18 @@ material = SubResource("ShaderMaterial_jyhfs")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 74.0
-offset_top = -24.0
-offset_right = 74.0
-offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1963856840]
 environment = SubResource("Environment_p57ef")
+script = ExtResource("7_sky02")
+
+[node name="Debug" type="Node" parent="." unique_id=1646813265]
+script = ExtResource("8_dbg01")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=543945003]
+
+[node name="Health" type="HBoxContainer" parent="HUD" unique_id=829143507]
+theme_override_constants/separation = 1
+script = ExtResource("6_hud01")

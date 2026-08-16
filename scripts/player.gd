@@ -1,3 +1,5 @@
+# TODO: these should all be interfacable/reflectable for lua support in the future.
+
 extends CharacterBody3D
 
 @export var move_speed := 2.5
@@ -9,9 +11,6 @@ extends CharacterBody3D
 @onready var camera_pivot: Node3D = $"../CameraYaw"
 @onready var skeleton: Skeleton3D = $Pivot/Character/Armature/Skeleton3D
 
-enum AnimState { IDLE, WALK }
-var anim_state := AnimState.IDLE
-
 var r_leg: int
 var l_leg: int
 var r_arm: int
@@ -19,19 +18,43 @@ var l_arm: int
 
 var base_pose := {}
 var walk_time := 0.0
-var prev_walk_angle := 0.0
-var finishing_walk := false
+var walk_blend := 0.0
 var jump_blend := 0.0
+var climb_blend := 0.0
 
-var jump_initialized := false
-var start_r_arm_rot: Vector3
-var start_l_arm_rot: Vector3
+var r_arm_angle := 0.0
+var l_arm_angle := 0.0
+
+const MAX_HP := 20
+const HP_PER_HEART := 2
+const POISON_HALF_LIFE := 30.0
+const POISON_TICK_INTERVAL := 15.0
+
+var hp := MAX_HP
+var poison := 0.0
+var poison_tick_timer := 0.0
 
 const WALK_FREQ := 7.5
 const WALK_AMPLITUDE := 0.7
 const IDLE_FREQ := 0.8
 const IDLE_AMPLITUDE := 0.1
+const WALK_BLEND_SPEED := 5.0
 const JUMP_BLEND_SPEED := 6.0
+const JUMP_ARM_RAISE := PI
+
+# WIP for ramp handling.
+# this will also be used for trusses, etc.
+const CLIMB_SLOPE_MIN_DEG := 12.0
+const CLIMB_ARM_LIFT := 0.9
+const CLIMB_WOBBLE_FREQ := 9.0
+const CLIMB_WOBBLE_AMPLITUDE := 0.25
+const CLIMB_BLEND_SPEED := 6.0
+
+# manually coded offsets for normalizing the rotations due to rig being slightly quirky
+const RLEG_SWING_AXIS := Vector3(-0.0498, 0.3779, 0.9245)
+const LLEG_SWING_AXIS := Vector3(-0.0498, -0.3779, -0.9245)
+const RARM_SWING_AXIS := Vector3(-0.7399, 0.6727, 0.0)
+const LARM_SWING_AXIS := Vector3(-0.7399, -0.6727, 0.0)
 
 func _ready():
 	r_leg = skeleton.find_bone("RLeg_BONE")
@@ -45,15 +68,36 @@ func _ready():
 
 func _physics_process(delta):
 	handle_movement(delta)
-	var moving = velocity.length() > 0.1
-	update_animation_state(moving)
-	
+
 	if is_on_floor():
 		walk_time += delta
-	else:
-		walk_time = 0.0
 
 	update_animation(delta)
+	update_health(delta)
+
+func update_health(delta: float):
+	poison *= pow(0.5, delta / POISON_HALF_LIFE)
+	if poison < 0.01:
+		poison = 0.0
+
+	if poison > 0.0:
+		poison_tick_timer += delta
+		if poison_tick_timer >= POISON_TICK_INTERVAL:
+			poison_tick_timer -= POISON_TICK_INTERVAL
+			var poison_hearts := int(poison / float(HP_PER_HEART))
+			hp = max(hp - poison_hearts, 0)
+	else:
+		poison_tick_timer = 0.0
+
+
+func add_poison(hearts: float):
+	poison += hearts * HP_PER_HEART
+
+func take_damage(amount: int):
+	hp = clamp(hp - amount, 0, MAX_HP)
+
+func heal(amount: int):
+	hp = clamp(hp + amount, 0, MAX_HP)
 
 func handle_movement(delta):
 	var input_vec := Vector2.ZERO
@@ -87,77 +131,57 @@ func handle_movement(delta):
 	move_and_slide()
 
 
-func update_animation_state(moving: bool):
-	if moving:
-		anim_state = AnimState.WALK
-		finishing_walk = false
-	elif anim_state == AnimState.WALK:
-		finishing_walk = true
-	else:
-		anim_state = AnimState.IDLE
-
-
 func update_animation(delta: float):
+	var moving := Vector2(velocity.x, velocity.z).length() > 0.1
+	walk_blend = move_toward(walk_blend, 1.0 if moving else 0.0, delta * WALK_BLEND_SPEED)
+
 	jump_blend = move_toward(jump_blend, 0.0 if is_on_floor() else 1.0, delta * JUMP_BLEND_SPEED)
 
-	match anim_state:
-		AnimState.WALK: animate_walk(walk_time)
-		AnimState.IDLE: animate_idle(walk_time)
+	var slope_deg := 0.0
+
+	# RAMP correction
+	if is_on_floor():
+		slope_deg = rad_to_deg(get_floor_normal().angle_to(Vector3.UP))
+	# TRUSS/RAMP detection
+	var climbing := is_on_floor() and moving and slope_deg > CLIMB_SLOPE_MIN_DEG
+	climb_blend = move_toward(climb_blend, 1.0 if climbing else 0.0, delta * CLIMB_BLEND_SPEED)
+
+	apply_locomotion(walk_time)
 
 	if jump_blend > 0.0:
 		apply_jump_overlay()
 
+func apply_locomotion(time: float):
+	var idle_angle := IDLE_AMPLITUDE * sin(time * IDLE_FREQ)
+	var walk_angle := WALK_AMPLITUDE * sin(time * WALK_FREQ)
+	var locomotion_angle: float = lerp(idle_angle, walk_angle, walk_blend)
 
-func animate_walk(time: float):
-	var angle := WALK_AMPLITUDE * sin(time * WALK_FREQ)
+	# Climbing a ramp: lift both arms partway up, with a bit of alternating
+	# wobble layered on top, like classic Roblox's scrambling-up-a-slope look.
+	var climb_lift := CLIMB_ARM_LIFT * climb_blend
+	var climb_wobble := CLIMB_WOBBLE_AMPLITUDE * sin(time * CLIMB_WOBBLE_FREQ) * climb_blend
 
-	if finishing_walk:
-		if sign(prev_walk_angle) != sign(angle):
-			finishing_walk = false
-			anim_state = AnimState.IDLE
-			animate_idle(time)
-			prev_walk_angle = angle
-			return
+	r_arm_angle = -locomotion_angle + climb_lift - climb_wobble
+	l_arm_angle = locomotion_angle + climb_lift + climb_wobble
 
-	prev_walk_angle = angle
+	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(RARM_SWING_AXIS, r_arm_angle))
+	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(LARM_SWING_AXIS, l_arm_angle))
 
-	if jump_blend > 0.0:
-		return
+	var idle_r_leg: Quaternion = base_pose[r_leg] * Quaternion(Vector3.FORWARD, -idle_angle)
+	var idle_l_leg: Quaternion = base_pose[l_leg] * Quaternion(Vector3.FORWARD, -idle_angle)
+	var walk_r_leg: Quaternion = base_pose[r_leg] * Quaternion(RLEG_SWING_AXIS, -walk_angle)
+	var walk_l_leg: Quaternion = base_pose[l_leg] * Quaternion(LLEG_SWING_AXIS, walk_angle)
 
-	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(Vector3.LEFT, -angle))
-	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(Vector3.RIGHT, -angle))
-	skeleton.set_bone_pose_rotation(r_leg, base_pose[r_leg] * Quaternion(Vector3.FORWARD, -angle))
-	skeleton.set_bone_pose_rotation(l_leg, base_pose[l_leg] * Quaternion(Vector3.FORWARD, -angle))
-
-
-func animate_idle(time: float):
-	var angle := IDLE_AMPLITUDE * sin(time * IDLE_FREQ)
-
-	if jump_blend > 0.0:
-		return
-
-	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(Vector3.LEFT, -angle))
-	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(Vector3.RIGHT, -angle))
-	skeleton.set_bone_pose_rotation(r_leg, base_pose[r_leg] * Quaternion(Vector3.FORWARD, -angle))
-	skeleton.set_bone_pose_rotation(l_leg, base_pose[l_leg] * Quaternion(Vector3.FORWARD, -angle))
+	skeleton.set_bone_pose_rotation(r_leg, idle_r_leg.slerp(walk_r_leg, walk_blend))
+	skeleton.set_bone_pose_rotation(l_leg, idle_l_leg.slerp(walk_l_leg, walk_blend))
 
 
 func apply_jump_overlay():
-	if not jump_initialized:
-		start_r_arm_rot = skeleton.get_bone_pose(r_arm).basis.get_euler()
-		start_l_arm_rot = skeleton.get_bone_pose(l_arm).basis.get_euler()
-		jump_initialized = true
+	var final_r_angle: float = lerp(r_arm_angle, JUMP_ARM_RAISE, jump_blend)
+	var final_l_angle: float = lerp(l_arm_angle, JUMP_ARM_RAISE, jump_blend)
 
-	var target_r := start_r_arm_rot + Vector3(PI, 0, 0)
-	var target_l := start_l_arm_rot + Vector3(PI, 0, 0)
-
-	var r_pose := skeleton.get_bone_pose(r_arm)
-	r_pose.basis = Basis.from_euler(start_r_arm_rot.lerp(target_r, jump_blend))
-	skeleton.set_bone_pose_rotation(r_arm, r_pose.basis.get_rotation_quaternion())
-
-	var l_pose := skeleton.get_bone_pose(l_arm)
-	l_pose.basis = Basis.from_euler(start_l_arm_rot.lerp(target_l, jump_blend))
-	skeleton.set_bone_pose_rotation(l_arm, l_pose.basis.get_rotation_quaternion())
+	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(RARM_SWING_AXIS, final_r_angle))
+	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(LARM_SWING_AXIS, final_l_angle))
 
 	skeleton.set_bone_pose_rotation(r_leg, skeleton.get_bone_pose_rotation(r_leg).slerp(base_pose[r_leg], jump_blend))
 	skeleton.set_bone_pose_rotation(l_leg, skeleton.get_bone_pose_rotation(l_leg).slerp(base_pose[l_leg], jump_blend))

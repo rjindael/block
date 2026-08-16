@@ -5,21 +5,27 @@
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lrhn5"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_my7n2"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dp8ca"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2cgup"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_a5ia6"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0lw5n"]
 albedo_texture = ExtResource("2_rkhd4")
+texture_filter = 0
 
 [node name="Character" unique_id=1539593251 instance=ExtResource("1_agfs1")]
 

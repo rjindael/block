@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ufaifpvqq2bd"
-path.s3tc="res://.godot/imported/uv.png-3c8b15a179bf0f6b248efea56a01aa4d.s3tc.ctex"
+path="res://.godot/imported/uv.png-3c8b15a179bf0f6b248efea56a01aa4d.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://art/avatar/textures/uv.png"
-dest_files=["res://.godot/imported/uv.png-3c8b15a179bf0f6b248efea56a01aa4d.s3tc.ctex"]
+dest_files=["res://.godot/imported/uv.png-3c8b15a179bf0f6b248efea56a01aa4d.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -24,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
