@@ -187,8 +187,7 @@ func handle_movement(delta):
 		velocity.y -= gravity * delta
 	elif Input.is_action_pressed("jump"):
 		velocity.y = jump_velocity
-		if Input.is_action_just_pressed("jump"):
-			jump_audio.play()
+		jump_audio.play()
 
 	move_and_slide()
 

@@ -49,7 +49,7 @@ func _update_text() -> void:
 	if ready_to_respawn:
 		label.text = "Click to respawn"
 	else:
-		label.text = "Click to respawn in %d seconds..." % seconds_left
+		label.text = "Click to respawn in %d second%s..." % [seconds_left, "" if seconds_left == 1 else "s"]
 
 
 func _unhandled_input(event: InputEvent) -> void:
