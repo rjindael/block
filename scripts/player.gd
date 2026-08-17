@@ -32,6 +32,7 @@ var walk_time := 0.0
 var walk_phase := 0.0
 var walk_blend := 0.0
 var jump_blend := 0.0
+var land_hold_timer := 0.0
 var climb_blend := 0.0
 var sprinting := false
 var sprint_blend := 0.0
@@ -71,10 +72,16 @@ const CRAWL_ARM_ANGLE := 0.9
 const CRAWL_LEAN_ANGLE := 1.3
 const CRAWL_SPEED := 0.8
 
+# Small, hand-tuned rather than derived from leg mesh geometry: the visual
+# character node moves independently of the (untouched) collision capsule,
+# so an overestimated drop clips the mesh through the floor. Erring low
+# keeps feet planted-ish without ever sinking below ground.
+const CROUCH_HEIGHT_DROP := 0.12
+const CRAWL_HEIGHT_DROP := 0.2
+
 var crouching := false
 var crouch_blend := 0.0
 var crawl_blend := 0.0
-var leg_height := 0.0
 
 const SLIDE_FRICTION := 6.0
 const SLIDE_SMOKE_INTERVAL := 0.07
@@ -90,13 +97,6 @@ const LONG_JUMP_VELOCITY := 6.0
 const LONG_JUMP_SPEED := 9.0
 const LONG_JUMP_ARM_ANGLE := -1.6
 const LONG_JUMP_LEAN := 0.9
-
-# broken
-const WALL_JUMP_PUSH := 5.0
-const WALL_JUMP_VELOCITY := 8.5
-const WALL_JUMP_COOLDOWN := 0.4
-
-var wall_jump_cooldown_timer := 0.0
 
 const LEDGE_CHECK_DISTANCE := 0.6
 const LEDGE_CHECK_HEIGHT_WALL := 1.3
@@ -132,6 +132,7 @@ const IDLE_AMPLITUDE := 0.1
 const WALK_BLEND_SPEED := 5.0
 const JUMP_BLEND_SPEED := 6.0
 const LAND_BLEND_SPEED := 1.8
+const LAND_POSE_HOLD := 0.14
 const JUMP_ARM_RAISE := PI
 
 # WIP for ramp handling.
@@ -179,10 +180,6 @@ func _ready():
 
 	for bone in [r_leg, l_leg, r_arm, l_arm]:
 		base_pose[bone] = skeleton.get_bone_pose_rotation(bone)
-
-	var rleg_part := skeleton.get_node("RLeg_BONE/RLeg") as MeshInstance3D
-	if rleg_part and rleg_part.mesh:
-		leg_height = rleg_part.mesh.get_aabb().size.y
 
 	spawn_transform = global_transform
 	death_ui.respawn_requested.connect(respawn)
@@ -306,16 +303,10 @@ func handle_movement(delta):
 			var target_basis := Basis.looking_at(move_dir, Vector3.UP)
 			pivot.basis = pivot.basis.slerp(target_basis, turn_speed * delta)
 
-	if wall_jump_cooldown_timer > 0.0:
-		wall_jump_cooldown_timer = max(wall_jump_cooldown_timer - delta, 0.0)
-
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 
 		check_ledge_grab()
-
-		#if is_on_wall() and wall_jump_cooldown_timer <= 0.0 and velocity.y < 0.0 and Input.is_action_pressed("jump"):
-		#	perform_wall_jump()
 	else:
 		grounded_time += delta
 		if jump_combo > 0 and grounded_time > JUMP_COMBO_WINDOW:
@@ -357,25 +348,6 @@ func perform_backflip_jump() -> void:
 	grounded_time = 0.0
 	jump_combo = 0
 	air_combo = 4
-	backflip_spin_time = 0.0
-
-	stamina = max(stamina - STAMINA_JUMP_COST, 0.0)
-	jump_audio.play()
-
-
-func perform_wall_jump() -> void:
-	var wall_normal := get_wall_normal()
-
-	velocity = wall_normal * WALL_JUMP_PUSH
-	velocity.y = WALL_JUMP_VELOCITY
-
-	if wall_normal.length() > 0.01:
-		pivot.basis = Basis.looking_at(wall_normal, Vector3.UP)
-
-	wall_jump_cooldown_timer = WALL_JUMP_COOLDOWN
-	grounded_time = 0.0
-	jump_combo = 0
-	air_combo = 0
 	backflip_spin_time = 0.0
 
 	stamina = max(stamina - STAMINA_JUMP_COST, 0.0)
@@ -498,8 +470,15 @@ func update_animation(delta: float):
 
 	update_walk_audio(moving and is_on_floor())
 
-	var jump_blend_speed := LAND_BLEND_SPEED if is_on_floor() else JUMP_BLEND_SPEED
-	jump_blend = move_toward(jump_blend, 0.0 if is_on_floor() else 1.0, delta * jump_blend_speed)
+	if is_on_floor():
+		if land_hold_timer > 0.0:
+			land_hold_timer -= delta
+			jump_blend = move_toward(jump_blend, 1.0, delta * JUMP_BLEND_SPEED)
+		else:
+			jump_blend = move_toward(jump_blend, 0.0, delta * LAND_BLEND_SPEED)
+	else:
+		jump_blend = move_toward(jump_blend, 1.0, delta * JUMP_BLEND_SPEED)
+		land_hold_timer = LAND_POSE_HOLD
 
 	var slope_deg := 0.0
 
@@ -619,7 +598,8 @@ func apply_crouch_overlay() -> void:
 	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(RARM_SWING_AXIS, -arm_angle))
 	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(LARM_SWING_AXIS, -arm_angle))
 
-	var drop: float = leg_height * (1.0 - leg_scale)
+	var drop_target: float = lerp(CROUCH_HEIGHT_DROP, CRAWL_HEIGHT_DROP, crawl_blend)
+	var drop: float = lerp(0.0, drop_target, crouch_blend)
 	var lean: float = lerp(0.0, -CRAWL_LEAN_ANGLE * crawl_blend, crouch_blend)
 	_set_character_pose(lean, drop)
 
@@ -634,6 +614,9 @@ func die() -> void:
 	walk_audio.stop()
 	die_audio.play()
 
+	stamina = MAX_STAMINA
+	stamina_regen_delay = 0.0
+
 	clear_forcefield()
 
 	spawn_ragdoll()
@@ -645,6 +628,8 @@ func respawn() -> void:
 	hp = MAX_HP
 	poison = 0.0
 	poison_tick_timer = 0.0
+	stamina = MAX_STAMINA
+	stamina_regen_delay = 0.0
 	global_transform = spawn_transform
 	velocity = Vector3.ZERO
 
