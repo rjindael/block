@@ -34,10 +34,14 @@ stream = ExtResource("3_walk01")
 [node name="JumpAudio" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("4_jump01")
 
-[node name="DieAudio" type="AudioStreamPlayer" parent="."]
+[node name="DieAudio" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 stream = ExtResource("5_die01")
 volume_db = -8.0
+unit_size = 8.0
 
-[node name="SpawnAudio" type="AudioStreamPlayer" parent="."]
+[node name="SpawnAudio" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 stream = ExtResource("6_spawn01")
 volume_db = -8.0
+unit_size = 8.0

@@ -6,6 +6,7 @@ extends CharacterBody3D
 @export var jump_velocity := 7.0
 @export var gravity := 18.0
 @export var turn_speed := 6.0
+@export var sprint_multiplier := 1.7
 
 const DeathUIScript := preload("res://scripts/death_ui.gd")
 
@@ -15,8 +16,8 @@ const DeathUIScript := preload("res://scripts/death_ui.gd")
 @onready var character: Node3D = $Pivot/Character
 @onready var walk_audio: AudioStreamPlayer = $WalkAudio
 @onready var jump_audio: AudioStreamPlayer = $JumpAudio
-@onready var die_audio: AudioStreamPlayer = $DieAudio
-@onready var spawn_audio: AudioStreamPlayer = $SpawnAudio
+@onready var die_audio: AudioStreamPlayer3D = $DieAudio
+@onready var spawn_audio: AudioStreamPlayer3D = $SpawnAudio
 @onready var death_ui: DeathUIScript = get_node("../DeathUI/Root")
 
 @onready var camera_rig = get_node("..")
@@ -28,9 +29,12 @@ var l_arm: int
 
 var base_pose := {}
 var walk_time := 0.0
+var walk_phase := 0.0
 var walk_blend := 0.0
 var jump_blend := 0.0
 var climb_blend := 0.0
+var sprinting := false
+var sprint_blend := 0.0
 
 var r_arm_angle := 0.0
 var l_arm_angle := 0.0
@@ -46,6 +50,12 @@ var poison_tick_timer := 0.0
 
 const WALK_FREQ := 8.5
 const WALK_AMPLITUDE := 0.7
+const RUN_FREQ := 13.0
+const RUN_AMPLITUDE := 1.05
+const RUN_ARM_SWING_MULT := 1.3
+const RUN_ARM_LIFT := 0.5
+const SPRINT_LEAN_ANGLE := 0.24
+const SPRINT_BLEND_SPEED := 6.0
 const IDLE_FREQ := 0.8
 const IDLE_AMPLITUDE := 0.1
 const WALK_BLEND_SPEED := 5.0
@@ -154,6 +164,9 @@ func handle_movement(delta):
 	if input_vec.length() > 1.0:
 		input_vec = input_vec.normalized()
 
+	sprinting = Input.is_action_pressed("sprint") and input_vec.length() > 0.1
+	sprint_blend = move_toward(sprint_blend, 1.0 if sprinting else 0.0, delta * SPRINT_BLEND_SPEED)
+
 	var cam_forward := camera_pivot.global_transform.basis.z
 	var cam_right := camera_pivot.global_transform.basis.x
 	cam_forward.y = 0.0
@@ -161,9 +174,10 @@ func handle_movement(delta):
 	cam_forward = cam_forward.normalized()
 	cam_right = cam_right.normalized()
 
+	var speed: float = move_speed * lerp(1.0, sprint_multiplier, sprint_blend)
 	var move_dir := cam_right * input_vec.x + cam_forward * input_vec.y
-	velocity.x = move_dir.x * move_speed
-	velocity.z = move_dir.z * move_speed
+	velocity.x = move_dir.x * speed
+	velocity.z = move_dir.z * speed
 
 	if move_dir.length() > 0.001:
 		var target_basis := Basis.looking_at(move_dir, Vector3.UP)
@@ -179,6 +193,8 @@ func handle_movement(delta):
 	move_and_slide()
 
 func update_walk_audio(walking: bool) -> void:
+	walk_audio.pitch_scale = lerp(1.0, RUN_FREQ / WALK_FREQ, sprint_blend)
+
 	if walking:
 		if not walk_audio.playing:
 			walk_audio.play()
@@ -204,23 +220,33 @@ func update_animation(delta: float):
 	var climbing := is_on_floor() and moving and slope_deg > CLIMB_SLOPE_MIN_DEG
 	climb_blend = move_toward(climb_blend, 1.0 if climbing else 0.0, delta * CLIMB_BLEND_SPEED)
 
-	apply_locomotion(walk_time)
+	var stride_freq: float = lerp(WALK_FREQ, RUN_FREQ, sprint_blend)
+	if is_on_floor():
+		walk_phase += stride_freq * delta
+
+	apply_locomotion()
 
 	if jump_blend > 0.0:
 		apply_jump_overlay()
 
-func apply_locomotion(time: float):
-	var idle_angle := IDLE_AMPLITUDE * sin(time * IDLE_FREQ)
-	var walk_angle := WALK_AMPLITUDE * sin(time * WALK_FREQ)
+func apply_locomotion() -> void:
+	var idle_angle := IDLE_AMPLITUDE * sin(walk_time * IDLE_FREQ)
+
+	var amplitude: float = lerp(WALK_AMPLITUDE, RUN_AMPLITUDE, sprint_blend)
+	var walk_angle := amplitude * sin(walk_phase)
+
 	var locomotion_angle: float = lerp(idle_angle, walk_angle, walk_blend)
 
 	# Climbing a ramp: lift both arms partway up, with a bit of alternating
 	# wobble layered on top, like classic Roblox's scrambling-up-a-slope look.
 	var climb_lift := CLIMB_ARM_LIFT * climb_blend
-	var climb_wobble := CLIMB_WOBBLE_AMPLITUDE * sin(time * CLIMB_WOBBLE_FREQ) * climb_blend
+	var climb_wobble := CLIMB_WOBBLE_AMPLITUDE * sin(walk_time * CLIMB_WOBBLE_FREQ) * climb_blend
 
-	r_arm_angle = -locomotion_angle + climb_lift - climb_wobble
-	l_arm_angle = locomotion_angle + climb_lift + climb_wobble
+	var arm_swing: float = locomotion_angle * lerp(1.0, RUN_ARM_SWING_MULT, sprint_blend)
+	var arm_lift := RUN_ARM_LIFT * sprint_blend
+
+	r_arm_angle = -arm_swing + climb_lift - climb_wobble + arm_lift
+	l_arm_angle = arm_swing + climb_lift + climb_wobble + arm_lift
 
 	skeleton.set_bone_pose_rotation(r_arm, base_pose[r_arm] * Quaternion(RARM_SWING_AXIS, r_arm_angle))
 	skeleton.set_bone_pose_rotation(l_arm, base_pose[l_arm] * Quaternion(LARM_SWING_AXIS, l_arm_angle))
@@ -232,6 +258,8 @@ func apply_locomotion(time: float):
 
 	skeleton.set_bone_pose_rotation(r_leg, idle_r_leg.slerp(walk_r_leg, walk_blend))
 	skeleton.set_bone_pose_rotation(l_leg, idle_l_leg.slerp(walk_l_leg, walk_blend))
+
+	character.rotation.x = -SPRINT_LEAN_ANGLE * sprint_blend
 
 
 func apply_jump_overlay():
@@ -257,9 +285,7 @@ func die() -> void:
 	walk_audio.stop()
 	die_audio.play()
 
-	# Mouse capture while dead is handled by camera.gd (always captured,
-	# regardless of mouse_locked, the instant is_dead is true) - clicking to
-	# respawn doesn't need a visible cursor since it's just "any left click."
+	clear_forcefield()
 
 	spawn_ragdoll()
 	death_ui.start_countdown()
@@ -386,7 +412,17 @@ const BOX_EDGES := [
 	[0, 4], [1, 5], [2, 6], [3, 7],
 ]
 
+var forcefield_cages: Array[Node3D] = []
+var forcefield_tween: Tween
+var forcefield_mat: StandardMaterial3D
+var forcefield_generation := 0
+
 func spawn_forcefield() -> void:
+	clear_forcefield()
+
+	forcefield_generation += 1
+	var generation := forcefield_generation
+
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -394,11 +430,13 @@ func spawn_forcefield() -> void:
 	mat.emission_enabled = true
 	mat.emission = FORCEFIELD_COLORS[0]
 	mat.emission_energy_multiplier = 1.5
+	forcefield_mat = mat
 
 	var tween := create_tween().set_loops()
 	var colors := FORCEFIELD_COLORS + [FORCEFIELD_COLORS[0]]
 	for i in range(1, colors.size()):
 		tween.tween_method(_set_forcefield_hue.bind(mat), colors[i - 1], colors[i], FORCEFIELD_CYCLE_SPEED)
+	forcefield_tween = tween
 
 	camera_rig.register_fade_material(mat)
 
@@ -414,16 +452,33 @@ func spawn_forcefield() -> void:
 		cage.position = aabb.get_center()
 
 		part.add_child(cage)
+		forcefield_cages.append(cage)
 
 		if not is_tween_bound:
 			tween.bind_node(cage)
 			is_tween_bound = true
 
-		get_tree().create_timer(FORCEFIELD_DURATION).timeout.connect(cage.queue_free)
+	get_tree().create_timer(FORCEFIELD_DURATION).timeout.connect(_on_forcefield_timeout.bind(generation))
 
-	var cleanup_timer := get_tree().create_timer(FORCEFIELD_DURATION)
-	cleanup_timer.timeout.connect(tween.kill)
-	cleanup_timer.timeout.connect(camera_rig.unregister_fade_material.bind(mat))
+
+func _on_forcefield_timeout(generation: int) -> void:
+	if generation == forcefield_generation:
+		clear_forcefield()
+
+
+func clear_forcefield() -> void:
+	for cage in forcefield_cages:
+		if is_instance_valid(cage):
+			cage.queue_free()
+	forcefield_cages.clear()
+
+	if forcefield_tween and forcefield_tween.is_valid():
+		forcefield_tween.kill()
+	forcefield_tween = null
+
+	if forcefield_mat:
+		camera_rig.unregister_fade_material(forcefield_mat)
+	forcefield_mat = null
 
 
 func _set_forcefield_hue(color: Color, mat: StandardMaterial3D) -> void:

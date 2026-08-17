@@ -7,6 +7,10 @@ const PlayerScene := preload("res://scenes/player.tscn")
 # tab-out zoom distance
 const TAB_ZOOM_DISTANCE := 4.0
 
+# sprint FOV
+const SPRINT_FOV_BOOST := 6.0
+const FOV_LERP_SPEED := 10.0
+
 # global time scale that should be state dependent but its here for now
 @export var time_scale := 0.9
 
@@ -54,12 +58,15 @@ var _was_in_fp_zone := false
 var _body_meshes: Array[MeshInstance3D] = []
 var _body_mats: Array[StandardMaterial3D] = []
 
+var base_fov := 60.0
+
 func _enter_tree() -> void:
 	add_child(PlayerScene.instantiate())
 
 func _ready() -> void:
 	Engine.time_scale = time_scale
 	camera.position = Vector3(0.0, 0.0, zoom)
+	base_fov = camera.fov
 	_cache_body_meshes()
 	_update_mouselock_icon()
 
@@ -95,8 +102,9 @@ func _clamp_pitch() -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_M:
-			mouse_locked = not mouse_locked
-			_update_mouselock_icon()
+			if not player.get("is_dead"):
+				mouse_locked = not mouse_locked
+				_update_mouselock_icon()
 		elif event.physical_keycode == KEY_TAB:
 			zoom_target = TAB_ZOOM_DISTANCE if first_person else min_zoom
 			mouse_locked = true
@@ -114,7 +122,7 @@ func _input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if rotating else Input.MOUSE_MODE_VISIBLE
 
 	if event is InputEventMouseMotion:
-		if rotating or mouse_locked:
+		if rotating or mouse_locked or player.get("is_dead"):
 			yaw   -= event.relative.x * mouse_sensitivity
 			pitch -= event.relative.y * mouse_sensitivity
 			_clamp_pitch()
@@ -182,6 +190,10 @@ func _process(delta: float) -> void:
 
 	var fade : Variant = clamp(inverse_lerp(fp_lock_threshold, fp_full_threshold + 0.5, zoom), 0.0, 1.0)
 	_set_body_alpha(1.0 - fade)
+
+	var sprint_blend : float = player.get("sprint_blend")
+	var target_fov := base_fov + SPRINT_FOV_BOOST * sprint_blend
+	camera.fov = lerp(camera.fov, target_fov, FOV_LERP_SPEED * delta)
 
 	camera_yaw.global_position = camera_target.global_position
 	camera_yaw.rotation.y = yaw
